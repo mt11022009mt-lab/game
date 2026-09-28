@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SoạnTKB — Xếp thời khóa biểu thông minh</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        fontFamily: { display: ['Lexend','sans-serif'], sans: ['Inter','sans-serif'] },
+        colors: { ink: '#0f172a' }
+      }
+    }
+  }
+</script>
+<style>
+  :root{ color-scheme: light; }
+  html.dark{ color-scheme: dark; }
+  body{
+    font-family: 'Inter', sans-serif;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background:#f8fafc;
+  }
+  html.dark body{ background:#0b1220; }
+  .font-display{ font-family:'Lexend', sans-serif; }
+  @media (prefers-reduced-motion: reduce){
+    *{ transition: none !important; animation: none !important; }
+  }
+  ::-webkit-scrollbar{ height:10px; width:10px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+  ::-webkit-scrollbar-thumb{ background:#cbd5e1; border-radius:8px; }
+  html.dark ::-webkit-scrollbar-thumb{ background:#334155; }
+
+  .lesson-card{ cursor:grab; touch-action:none; }
+  .lesson-card:active{ cursor:grabbing; }
+  .cell-drop.drag-over{ outline:2px dashed #2563eb; outline-offset:-2px; background:rgba(37,99,235,.08); }
+  .shake{ animation: shakeKey .35s; }
+  @keyframes shakeKey{ 0%,100%{transform:translateX(0)} 20%{transform:translateX(-4px)} 40%{transform:translateX(4px)} 60%{transform:translateX(-3px)} 80%{transform:translateX(3px)} }
+
+  @media print{
+    body *{ visibility:hidden; }
+    #printArea, #printArea *{ visibility:visible; }
+    #printArea{ position:absolute; left:0; top:0; width:100%; }
+    .no-print{ display:none !important; }
+  }
+</style>
+</head>
+<body class="min-h-screen text-slate-800 dark:text-slate-100 antialiased">
+
+<!-- ============================= HEADER / TOOLBAR ============================= -->
+<header class="no-print sticky top-0 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur border-b border-slate-200 dark:border-slate-700" style="padding-top:env(safe-area-inset-top,0px)">
+  <div class="max-w-[1600px] mx-auto px-3 sm:px-5 py-3 flex flex-wrap items-center gap-3">
+    <div class="flex items-center gap-2 mr-2">
+      <div class="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-display font-bold text-lg select-none">S</div>
+      <div class="leading-tight">
+        <p class="font-display font-semibold text-[15px] text-slate-900 dark:text-white">SoạnTKB</p>
+        <p class="text-[11px] text-slate-500 dark:text-slate-400 -mt-0.5">Xếp thời khóa biểu thông minh</p>
+      </div>
+    </div>
+
+    <!-- Perspective toggle -->
+    <div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 text-sm font-medium">
+      <button id="btnViewClass" class="px-3 py-1.5 rounded-md transition-colors" onclick="setPerspective('class')">Theo Lớp</button>
+      <button id="btnViewTeacher" class="px-3 py-1.5 rounded-md transition-colors" onclick="setPerspective('teacher')">Theo Giáo viên</button>
+    </div>
+
+    <select id="entitySelect" class="text-sm font-medium border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+
+    <div class="flex-1"></div>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <button onclick="openManageModal()" class="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Đổi tên Lớp/GV
+      </button>
+      <button onclick="loadSampleData()" class="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Dữ liệu mẫu
+      </button>
+      <button onclick="autoScheduleAll()" class="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-sm shadow-emerald-600/30">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        Tự động xếp tối ưu
+      </button>
+      <button onclick="clearSchedule()" class="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
+        Xóa lịch
+      </button>
+
+      <div class="relative">
+        <button onclick="toggleExportMenu()" class="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Xuất dữ liệu
+        </button>
+        <div id="exportMenu" class="hidden absolute right-0 mt-2 w-52 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg py-1.5 text-sm z-40">
+          <button onclick="printView()" class="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700">🖨️ In thời khóa biểu</button>
+          <button onclick="exportExcel()" class="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700">📊 Xuất Excel (.xlsx)</button>
+          <button onclick="exportCSV()" class="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700">📄 Xuất CSV</button>
+          <button onclick="exportImage()" class="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700">🖼️ Xuất hình ảnh (PNG)</button>
+        </div>
+      </div>
+
+      <button onclick="toggleTheme()" id="themeBtn" class="w-9 h-9 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" title="Đổi giao diện sáng/tối"></button>
+    </div>
+  </div>
+</header>
+
+<!-- ============================= MAIN LAYOUT ============================= -->
+<main class="max-w-[1600px] mx-auto px-3 sm:px-5 py-5 flex flex-col lg:flex-row gap-5">
+
+  <!-- SIDEBAR: unscheduled lessons -->
+  <aside id="sidebarPanel" class="no-print lg:w-72 shrink-0 order-2 lg:order-1">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 lg:sticky lg:top-24">
+      <div class="flex items-center justify-between mb-1">
+        <h2 class="font-display font-semibold text-sm">Tiết học cần xếp</h2>
+        <span id="sidebarProgress" class="text-xs font-medium text-slate-500 dark:text-slate-400"></span>
+      </div>
+      <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">Kéo thẻ vào ô trống trên bảng để xếp lịch.</p>
+      <div class="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden mb-4">
+        <div id="sidebarProgressBar" class="h-full bg-blue-600 transition-all duration-300" style="width:0%"></div>
+      </div>
+      <div id="sidebarList" class="space-y-2 max-h-[65vh] overflow-y-auto pr-1"
+           ondragover="event.preventDefault(); this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="handleSidebarDrop(event)"></div>
+    </div>
+  </aside>
+
+  <!-- GRID + panels -->
+  <section class="flex-1 order-1 lg:order-2 min-w-0">
+
+    <!-- Legend -->
+    <div class="no-print flex flex-wrap items-center gap-4 mb-3 text-xs font-medium text-slate-600 dark:text-slate-300">
+      <span class="flex items-center gap-1.5"><i class="inline-block w-3 h-3 rounded-sm bg-emerald-400"></i> Hợp lệ, vị trí đẹp</span>
+      <span class="flex items-center gap-1.5"><i class="inline-block w-3 h-3 rounded-sm bg-amber-400"></i> Cảnh báo nhẹ</span>
+      <span class="flex items-center gap-1.5"><i class="inline-block w-3 h-3 rounded-sm bg-rose-500"></i> Trùng lịch / vi phạm nặng</span>
+      <span class="flex items-center gap-1.5"><i class="inline-block w-3 h-3 rounded-sm border-2 border-dashed border-amber-400"></i> Tiết lủng (trống giữa buổi)</span>
+    </div>
+
+    <div id="printArea" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-3 sm:p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h1 id="gridTitle" class="font-display font-semibold text-base sm:text-lg text-slate-900 dark:text-white"></h1>
+        <span id="gridSubtitle" class="text-xs text-slate-500 dark:text-slate-400"></span>
+      </div>
+      <div class="overflow-x-auto">
+        <div id="gridContainer" class="min-w-[760px]"></div>
+      </div>
+    </div>
+
+    <!-- Violations -->
+    <div id="violationsPanel" class="no-print mt-4"></div>
+  </section>
+</main>
+
+<div id="toastHost" class="no-print fixed bottom-4 right-4 z-50 flex flex-col gap-2 items-end"></div>
+
+<!-- ============================= MODAL: ĐỔI TÊN LỚP / GIÁO VIÊN ============================= -->
+<div id="manageModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 no-print">
+  <div class="absolute inset-0 bg-slate-900/50" onclick="closeManageModal()"></div>
+  <div class="relative bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-5">
+    <div class="flex items-center justify-between mb-1">
+      <h2 class="font-display font-semibold text-base">Đổi tên Lớp &amp; Giáo viên</h2>
+      <button onclick="closeManageModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg leading-none">✕</button>
+    </div>
+    <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Sửa trực tiếp tên lớp / giáo viên theo trường của bạn rồi bấm Lưu — toàn bộ lịch đã xếp sẽ được giữ nguyên.</p>
+    <div class="grid sm:grid-cols-2 gap-5">
+      <div>
+        <h3 class="text-xs font-display font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">Danh sách lớp</h3>
+        <div id="manageClassList" class="space-y-2"></div>
+      </div>
+      <div>
+        <h3 class="text-xs font-display font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">Danh sách giáo viên</h3>
+        <div id="manageTeacherList" class="space-y-2"></div>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
+      <button onclick="closeManageModal()" class="px-3.5 py-1.5 text-sm font-medium rounded-lg border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Hủy</button>
+      <button onclick="saveManage()" class="px-3.5 py-1.5 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors">Lưu thay đổi</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   1) DỮ LIỆU NỀN (MÔN HỌC / GIÁO VIÊN / LỚP) — có thể coi là "dữ liệu mẫu"
+   ========================================================================= */
+const SUBJECTS = [
+  { id:'toan',  name:'Toán',        short:'Toán', periods:3, heavy:true,  light:false, double:false, color:'#2563eb' },
+  { id:'van',   name:'Ngữ văn',     short:'Văn',  periods:3, heavy:true,  light:false, double:false, color:'#7c3aed' },
+  { id:'anh',   name:'Tiếng Anh',   short:'Anh',  periods:3, heavy:true,  light:false, double:false, color:'#0891b2' },
+  { id:'ly',    name:'Vật lý',      short:'Lý',   periods:2, heavy:true,  light:false, double:false, color:'#db2777' },
+  { id:'hoa',   name:'Hóa học',     short:'Hóa',  periods:2, heavy:true,  light:false, double:false, color:'#ea580c' },
+  { id:'sinh',  name:'Sinh học',    short:'Sinh', periods:2, heavy:false, light:false, double:false, color:'#16a34a' },
+  { id:'su',    name:'Lịch sử',     short:'Sử',   periods:2, heavy:false, light:false, double:false, color:'#854d0e' },
+  { id:'dia',   name:'Địa lý',      short:'Địa',  periods:1, heavy:false, light:false, double:false, color:'#0d9488' },
+  { id:'gdcd',  name:'GDCD',        short:'GDCD', periods:1, heavy:false, light:false, double:false, color:'#4338ca' },
+  { id:'tin',   name:'Tin học',     short:'Tin',  periods:2, heavy:false, light:false, double:true,  color:'#6366f1' },
+  { id:'cn',    name:'Công nghệ',   short:'CN',   periods:1, heavy:false, light:false, double:false, color:'#57534e' },
+  { id:'the',   name:'Thể dục',     short:'TD',   periods:2, heavy:false, light:true,  double:false, color:'#dc2626' },
+  { id:'gdqp',  name:'GDQP-AN',     short:'GDQP', periods:1, heavy:false, light:true,  double:false, color:'#b91c1c' },
+  { id:'nhac',  name:'Âm nhạc',     short:'Nhạc', periods:1, heavy:false, light:true,  double:false, color:'#c2410c' },
+  { id:'hdtn',  name:'HĐTN-HN',     short:'HĐTN', periods:1, heavy:false, light:false, double:false, color:'#78716c' },
+];
+
+const TEACHERS = [
+  { id:'gv1', name:'Nguyễn Văn An',   subjectIds:['toan'] },
+  { id:'gv2', name:'Trần Thị Bình',   subjectIds:['van'] },
+  { id:'gv3', name:'Lê Thị Cúc',      subjectIds:['anh'] },
+  { id:'gv4', name:'Phạm Văn Đức',    subjectIds:['ly','cn'] },
+  { id:'gv5', name:'Hoàng Thị Giang', subjectIds:['hoa','sinh'] },
+  { id:'gv6', name:'Đỗ Thị Hoa',      subjectIds:['su','dia','gdcd'] },
+  { id:'gv7', name:'Bùi Văn Khoa',    subjectIds:['tin'] },
+  { id:'gv8', name:'Ngô Văn Long',    subjectIds:['the','gdqp'] },
+  { id:'gv9', name:'Đinh Thị Mai',    subjectIds:['nhac','hdtn'] },
+];
+
+const CLASSES = [
+  { id:'10a1', name:'10A1', grade:10 },
+  { id:'10a2', name:'10A2', grade:10 },
+  { id:'11a1', name:'11A1', grade:11 },
+  { id:'11a2', name:'11A2', grade:11 },
+];
+
+const DAYS = [
+  { id:'T2', label:'Thứ 2' }, { id:'T3', label:'Thứ 3' }, { id:'T4', label:'Thứ 4' },
+  { id:'T5', label:'Thứ 5' }, { id:'T6', label:'Thứ 6' }, { id:'T7', label:'Thứ 7' },
+];
+const SESSIONS = [ { id:'S', label:'Buổi Sáng' }, { id:'C', label:'Buổi Chiều' } ];
+const PERIODS = [1,2,3,4,5];
+const MAX_PER_DAY = 5; // trần số tiết / buổi / lớp (đúng theo yêu cầu "không quá 4-5 tiết/ngày")
+
+/* Sinh danh sách "phân công": mỗi lớp học mỗi môn với 1 giáo viên phụ trách cố định */
+function buildAssignments(){
+  const list = [];
+  CLASSES.forEach(c => {
+    SUBJECTS.forEach(s => {
+      const teacher = TEACHERS.find(t => t.subjectIds.includes(s.id));
+      list.push({ id:`${c.id}__${s.id}`, classId:c.id, subjectId:s.id, teacherId: teacher ? teacher.id : null, total: s.periods });
+    });
+  });
+  return list;
+}
+let assignments = buildAssignments();
+
+/* =========================================================================
+   2) TRẠNG THÁI ỨNG DỤNG
+   ========================================================================= */
+const state = {
+  perspective: 'class',              // 'class' | 'teacher'
+  selectedClass: CLASSES[0].id,
+  selectedTeacher: TEACHERS[0].id,
+  schedule: {},                      // key `${classId}|${day}|${session}|${period}` -> assignmentId
+};
+let unplacedUnits = [];              // các tiết auto-xếp không tìm được chỗ hợp lệ
+
+const $ = sel => document.querySelector(sel);
+const cellKey = (classId, day, session, period) => `${classId}|${day}|${session}|${period}`;
+const getSubject = id => SUBJECTS.find(s => s.id === id);
+const getTeacher = id => TEACHERS.find(t => t.id === id);
+const getClass = id => CLASSES.find(c => c.id === id);
+const getAssignment = id => assignments.find(a => a.id === id);
+
+/* =========================================================================
+   3) TIỆN ÍCH TRA CỨU LỊCH
+   ========================================================================= */
+function placedCountFor(assignmentId){
+  let n = 0;
+  for (const k in state.schedule) if (state.schedule[k] === assignmentId) n++;
+  return n;
+}
+function remainingFor(a){ return a.total - placedCountFor(a.id); }
+
+// Giáo viên `teacherId` có đang bận ở day/session/period (thuộc lớp khác `excludeClassId`) không?
+function teacherBusyAt(teacherId, day, session, period, excludeClassId){
+  for (const k in state.schedule){
+    const [cid, d, s, p] = k.split('|');
+    if (d === day && s === session && Number(p) === period && cid !== excludeClassId){
+      const a = getAssignment(state.schedule[k]);
+      if (a && a.teacherId === teacherId) return cid;
+    }
+  }
+  return null;
+}
+
+function dayEntries(classId, day, session){
+  // Trả về mảng {period, assignmentId} đã xếp trong 1 buổi của 1 lớp, sắp theo tiết
+  const out = [];
+  PERIODS.forEach(p => {
+    const k = cellKey(classId, day, session, p);
+    if (state.schedule[k]) out.push({ period:p, assignmentId: state.schedule[k] });
+  });
+  return out.sort((a,b)=>a.period-b.period);
+}
+
+/* =========================================================================
+   4) KIỂM TRA "THỜI KHÓA BIỂU ĐẸP" — TÍNH TRẠNG THÁI MÀU CHO TỪNG Ô
+   ========================================================================= */
+// Trả về {level:'empty'|'green'|'yellow'|'red', reasons:[...]}
+function computeCellStatus(classId, day, session, period){
+  const key = cellKey(classId, day, session, period);
+  const assignmentId = state.schedule[key];
+  const entries = dayEntries(classId, day, session);
+  const filledPeriods = entries.map(e=>e.period);
+
+  if (!assignmentId){
+    // Ô trống: kiểm tra có phải "tiết lủng" không (có tiết dạy trước và sau nó trong buổi)
+    const hasBefore = filledPeriods.some(p => p < period);
+    const hasAfter = filledPeriods.some(p => p > period);
+    if (hasBefore && hasAfter){
+      return { level:'gap', reasons:['Tiết lủng — đang bỏ trống giữa buổi dạy, hãy xếp kín hoặc dồn lại.'] };
+    }
+    return { level:'empty', reasons:[] };
+  }
+
+  const a = getAssignment(assignmentId);
+  const subj = getSubject(a.subjectId);
+  const reasons = [];
+  let level = 'green';
+
+  // (a) Trùng giáo viên — vi phạm nghiêm trọng
+  const conflictClass = teacherBusyAt(a.teacherId, day, session, period, classId);
+  if (conflictClass){
+    reasons.push(`Trùng lịch: GV ${getTeacher(a.teacherId).name} đang dạy lớp ${getClass(conflictClass).name} cùng tiết này.`);
+    level = 'red';
+  }
+
+  // (b) Môn không ghép đôi nhưng bị lặp lại 2 lần trong cùng 1 ngày
+  const sameSubjectCount = entries.filter(e => getAssignment(e.assignmentId).subjectId === a.subjectId).length;
+  if (!subj.double && sameSubjectCount > 1){
+    reasons.push(`Môn ${subj.name} bị xếp trùng ${sameSubjectCount} tiết trong cùng một ngày (nên trải đều các ngày khác nhau).`);
+    if (level !== 'red') level = 'yellow';
+  }
+
+  // (c) Môn nặng / môn năng khiếu-thể chất rơi vào tiết 5
+  if (period === 5 && subj.light){
+    reasons.push(`${subj.name} không nên xếp vào tiết 5 (cuối buổi, trưa nắng).`);
+    if (level !== 'red') level = 'yellow';
+  }
+  if (period === 5 && subj.heavy){
+    reasons.push(`${subj.name} là môn nặng, nên ưu tiên xếp tiết 1-3 thay vì tiết 5.`);
+    if (level !== 'red') level = 'yellow';
+  }
+
+  // (d) Quá tải trong ngày (>MAX_PER_DAY tiết cho lớp, tính cả 2 buổi)
+  const totalDayCount = SESSIONS.reduce((sum,s)=> sum + dayEntries(classId, day, s.id).length, 0);
+  if (totalDayCount > MAX_PER_DAY){
+    reasons.push(`Lớp học ${totalDayCount} tiết trong ngày — vượt mức khuyến nghị (tối đa ${MAX_PER_DAY} tiết/ngày).`);
+    if (level !== 'red') level = 'yellow';
+  }
+
+  return { level, reasons };
+}
+
+// Trạng thái cho ô nhìn theo Giáo viên: chỉ cần kiểm tra quá tải/ trùng (hiếm khi trùng vì đã chặn khi kéo-thả)
+function computeTeacherDayLoad(teacherId, day){
+  let count = 0;
+  SESSIONS.forEach(s => PERIODS.forEach(p => {
+    CLASSES.forEach(c => {
+      const k = cellKey(c.id, day, s.id, p);
+      const aId = state.schedule[k];
+      if (aId && getAssignment(aId).teacherId === teacherId) count++;
+    });
+  }));
+  return count;
+}
+
+/* =========================================================================
+   5) THUẬT TOÁN "TỰ ĐỘNG XẾP TỐI ƯU"
+   ---------------------------------------------------------------------
+   Đây là thuật toán tham lam (heuristic) theo 3 bước, áp dụng lần lượt
+   cho từng lớp — không phải lời giải tối ưu tuyệt đối nhưng đảm bảo các
+   nguyên tắc "TKB đẹp" cơ bản, để GV chỉ cần tinh chỉnh vài chỗ:
+
+   Bước 1 — GOM TIẾT: mỗi phân công (lớp-môn) được "nổ" thành các đơn vị
+            tiết học (unit); môn ghép đôi (double=true) được gom theo cặp.
+   Bước 2 — PHÂN BỔ NGÀY (round-robin có điều kiện): rải các unit vào 6
+            ngày sao cho: không vượt quá MAX_PER_DAY, không xếp 2 tiết cùng
+            môn (không ghép đôi) trong cùng 1 ngày, môn nặng được ưu tiên
+            xử lý trước để có nhiều lựa chọn ngày đẹp hơn.
+   Bước 3 — SẮP TIẾT TRONG NGÀY + CHỐT LỊCH: trong mỗi ngày, môn nặng được
+            đẩy lên các tiết đầu, môn nhẹ (TD/Nhạc) tránh tiết cuối; sau đó
+            ghi vào lịch thật — nếu phát hiện trùng giáo viên với lớp khác
+            (đã chốt trước đó), thuật toán dò các tiết trống khác trong
+            cùng ngày, rồi sang buổi Chiều, để tránh xung đột.
+   ========================================================================= */
+function autoScheduleClass(classId){
+  const classAssignments = assignments.filter(a => a.classId === classId);
+  const weight = subj => subj.heavy ? 2 : (subj.light ? 0 : 1);
+
+  // --- Bước 1: gom thành các "unit" tiết học ---
+  let units = [];
+  classAssignments.forEach(a => {
+    const subj = getSubject(a.subjectId);
+    let remaining = a.total;
+    if (subj.double){
+      while (remaining >= 2){ units.push({ assignmentId:a.id, subjectId:a.subjectId, size:2 }); remaining -= 2; }
+      if (remaining === 1){ units.push({ assignmentId:a.id, subjectId:a.subjectId, size:1 }); remaining -= 1; }
+    } else {
+      for (let i=0;i<remaining;i++) units.push({ assignmentId:a.id, subjectId:a.subjectId, size:1 });
+    }
+  });
+  units.sort((u1,u2) => weight(getSubject(u2.subjectId)) - weight(getSubject(u1.subjectId)));
+
+  // --- Bước 2: phân bổ vào các "giỏ" ngày/buổi ---
+  const buckets = {};
+  SESSIONS.forEach(s => { buckets[s.id] = {}; DAYS.forEach(d => buckets[s.id][d.id] = []); });
+  const subjectInDay = (session, day, subjectId) => buckets[session][day].some(u => u.subjectId === subjectId);
+
+  let cursor = 0;
+  units.forEach(unit => {
+    let placed = false;
+    for (const s of SESSIONS){
+      for (let off=0; off<DAYS.length && !placed; off++){
+        const day = DAYS[(cursor+off) % DAYS.length].id;
+        const bucket = buckets[s.id][day];
+        if (bucket.length + unit.size > MAX_PER_DAY) continue;
+        const subj = getSubject(unit.subjectId);
+        if (!subj.double && subjectInDay(s.id, day, unit.subjectId)) continue;
+        for (let i=0;i<unit.size;i++) bucket.push(unit);
+        placed = true;
+        cursor = (DAYS.findIndex(d=>d.id===day) + 1) % DAYS.length;
+      }
+      if (placed) break;
+    }
+    if (!placed) unplacedUnits.push({ ...unit, classId });
+  });
+
+  // --- Bước 3: sắp thứ tự trong ngày rồi chốt vào lịch thật ---
+  SESSIONS.forEach(s => {
+    DAYS.forEach(d => {
+      const bucket = buckets[s.id][d.id];
+      // Đẩy môn "nhẹ" ra khỏi tiết cuối cùng của buổi nếu có thể
+      if (bucket.length === MAX_PER_DAY){
+        const lastIdx = bucket.length - 1;
+        if (getSubject(bucket[lastIdx].subjectId).light){
+          for (let i=lastIdx-1;i>=0;i--){
+            if (!getSubject(bucket[i].subjectId).light){
+              [bucket[lastIdx], bucket[i]] = [bucket[i], bucket[lastIdx]];
+              break;
+            }
+          }
+        }
+      }
+      let period = 1;
+      bucket.forEach(unit => {
+        if (period > MAX_PER_DAY) { unplacedUnits.push({ ...unit, classId }); return; }
+        const teacherId = getAssignment(unit.assignmentId).teacherId;
+        let finalDay = d.id, finalSession = s.id, finalPeriod = period, resolved = true;
+
+        if (teacherBusyAt(teacherId, finalDay, finalSession, finalPeriod, classId) || state.schedule[cellKey(classId,finalDay,finalSession,finalPeriod)]){
+          resolved = false;
+          // Dò tiết trống khác cùng buổi
+          for (let p=1;p<=MAX_PER_DAY && !resolved;p++){
+            const k = cellKey(classId, finalDay, finalSession, p);
+            if (!state.schedule[k] && !teacherBusyAt(teacherId, finalDay, finalSession, p, classId)){ finalPeriod=p; resolved=true; }
+          }
+          // Dò sang buổi còn lại cùng ngày
+          if (!resolved){
+            const other = finalSession === 'S' ? 'C' : 'S';
+            for (let p=1;p<=MAX_PER_DAY && !resolved;p++){
+              const k = cellKey(classId, finalDay, other, p);
+              if (!state.schedule[k] && !teacherBusyAt(teacherId, finalDay, other, p, classId)){ finalSession=other; finalPeriod=p; resolved=true; }
+            }
+          }
+        }
+        if (resolved){ state.schedule[cellKey(classId, finalDay, finalSession, finalPeriod)] = unit.assignmentId; }
+        else unplacedUnits.push({ ...unit, classId });
+        period++;
+      });
+    });
+  });
+}
+
+function autoScheduleAll(){
+  state.schedule = {};
+  unplacedUnits = [];
+  CLASSES.forEach(c => autoScheduleClass(c.id));
+  renderAll();
+  if (unplacedUnits.length){
+    showToast(`Đã xếp xong, còn ${unplacedUnits.length} tiết chưa tìm được vị trí hợp lệ — vui lòng xếp tay thêm.`, 'warning');
+  } else {
+    showToast('Đã tự động xếp thời khóa biểu tối ưu cho tất cả các lớp!', 'success');
+  }
+}
+
+function clearSchedule(){
+  if (!confirm('Xóa toàn bộ thời khóa biểu hiện tại?')) return;
+  state.schedule = {};
+  unplacedUnits = [];
+  renderAll();
+  showToast('Đã xóa toàn bộ lịch. Bắt đầu xếp lại từ đầu.', 'success');
+}
+
+function loadSampleData(){
+  assignments = buildAssignments();
+  state.schedule = {};
+  unplacedUnits = [];
+  populateEntitySelect();
+  renderAll();
+  showToast('Đã tải dữ liệu mẫu: 4 lớp khối 10-11, 9 giáo viên bộ môn.', 'success');
+}
+
+/* =========================================================================
+   6) KÉO — THẢ (DRAG & DROP)
+   ========================================================================= */
+function handleSidebarDragStart(ev, assignmentId){
+  ev.dataTransfer.setData('text/plain', JSON.stringify({ type:'new', assignmentId }));
+  ev.dataTransfer.effectAllowed = 'move';
+}
+function handleCellDragStart(ev, key){
+  ev.dataTransfer.setData('text/plain', JSON.stringify({ type:'move', from:key }));
+  ev.dataTransfer.effectAllowed = 'move';
+}
+function allowDrop(ev){ ev.preventDefault(); ev.currentTarget.classList.add('drag-over'); }
+function dragLeaveCell(ev){ ev.currentTarget.classList.remove('drag-over'); }
+
+function handleCellDrop(ev, classId, day, session, period){
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('drag-over');
+  let data;
+  try { data = JSON.parse(ev.dataTransfer.getData('text/plain')); } catch(e){ return; }
+  const key = cellKey(classId, day, session, period);
+
+  if (data.type === 'new'){
+    if (state.schedule[key]){ flashCell(ev.currentTarget); return; }
+    const a = getAssignment(data.assignmentId);
+    const busy = teacherBusyAt(a.teacherId, day, session, period, classId);
+    if (busy){
+      showToast(`Không thể xếp: GV ${getTeacher(a.teacherId).name} đang dạy lớp ${getClass(busy).name} cùng tiết.`, 'danger');
+      flashCell(ev.currentTarget);
+      return;
+    }
+    state.schedule[key] = data.assignmentId;
+    renderAll();
+    return;
+  }
+
+  if (data.type === 'move'){
+    const fromKey = data.from;
+    if (fromKey === key) return;
+    const fromAssignmentId = state.schedule[fromKey];
+    const toAssignmentId = state.schedule[key];
+    if (!fromAssignmentId) return;
+
+    const [fClass, fDay, fSession, fPeriod] = fromKey.split('|');
+    const aFrom = getAssignment(fromAssignmentId);
+    const aTo = toAssignmentId ? getAssignment(toAssignmentId) : null;
+
+    // Kiểm tra trùng GV khi đưa aFrom sang vị trí mới
+    if (teacherBusyAt(aFrom.teacherId, day, session, period, classId)){
+      showToast(`Không thể chuyển: GV ${getTeacher(aFrom.teacherId).name} đã bận ở tiết này.`, 'danger');
+      flashCell(ev.currentTarget);
+      return;
+    }
+    // Nếu hoán đổi với ô đã có tiết, kiểm tra GV của tiết đó có bận ở vị trí cũ không
+    if (aTo && teacherBusyAt(aTo.teacherId, fDay, fSession, Number(fPeriod), fClass)){
+      showToast(`Không thể hoán đổi: GV ${getTeacher(aTo.teacherId).name} sẽ bị trùng lịch.`, 'danger');
+      flashCell(ev.currentTarget);
+      return;
+    }
+
+    state.schedule[key] = fromAssignmentId;
+    if (toAssignmentId) state.schedule[fromKey] = toAssignmentId;
+    else delete state.schedule[fromKey];
+    renderAll();
+  }
+}
+
+function handleSidebarDrop(ev){
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('drag-over');
+  let data;
+  try { data = JSON.parse(ev.dataTransfer.getData('text/plain')); } catch(e){ return; }
+  if (data.type === 'move'){ delete state.schedule[data.from]; renderAll(); }
+}
+
+function removeCell(key){ delete state.schedule[key]; renderAll(); }
+
+function flashCell(el){ el.classList.add('shake'); setTimeout(()=>el.classList.remove('shake'), 400); }
+
+/* =========================================================================
+   7) RENDER GIAO DIỆN
+   ========================================================================= */
+function setPerspective(p){
+  state.perspective = p;
+  populateEntitySelect();
+  renderAll();
+}
+
+function populateEntitySelect(){
+  const sel = $('#entitySelect');
+  sel.innerHTML = '';
+  const items = state.perspective === 'class' ? CLASSES : TEACHERS;
+  items.forEach(it => {
+    const opt = document.createElement('option');
+    opt.value = it.id;
+    opt.textContent = state.perspective === 'class' ? `Lớp ${it.name}` : `GV ${it.name}`;
+    sel.appendChild(opt);
+  });
+  sel.value = state.perspective === 'class' ? state.selectedClass : state.selectedTeacher;
+  sel.onchange = () => {
+    if (state.perspective === 'class') state.selectedClass = sel.value; else state.selectedTeacher = sel.value;
+    renderAll();
+  };
+}
+
+function statusClasses(level){
+  switch(level){
+    case 'red': return 'ring-2 ring-rose-500 bg-rose-50 dark:bg-rose-950/40';
+    case 'yellow': return 'ring-2 ring-amber-400 bg-amber-50 dark:bg-amber-950/30';
+    case 'green': return 'ring-1 ring-emerald-300 bg-emerald-50/60 dark:bg-emerald-950/20';
+    case 'gap': return 'border-2 border-dashed border-amber-400 bg-amber-50/40 dark:bg-amber-950/20';
+    default: return 'border border-dashed border-slate-200 dark:border-slate-700';
+  }
+}
+
+function renderAll(){
+  updateThemeButton();
+  updateToggleButtons();
+  if (state.perspective === 'class'){
+    $('#sidebarPanel').classList.remove('hidden');
+    renderSidebar();
+    renderClassGrid();
+  } else {
+    $('#sidebarPanel').classList.add('hidden');
+    renderTeacherGrid();
+  }
+  renderViolations();
+}
+
+function updateToggleButtons(){
+  const active = 'px-3 py-1.5 rounded-md bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm transition-colors';
+  const inactive = 'px-3 py-1.5 rounded-md text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors';
+  $('#btnViewClass').className = state.perspective === 'class' ? active : inactive;
+  $('#btnViewTeacher').className = state.perspective === 'teacher' ? active : inactive;
+}
+
+function renderSidebar(){
+  const classId = state.selectedClass;
+  const list = $('#sidebarList');
+  list.innerHTML = '';
+  const classAssignments = assignments.filter(a => a.classId === classId);
+  let totalNeeded = 0, totalPlaced = 0;
+
+  classAssignments.forEach(a => {
+    const subj = getSubject(a.subjectId);
+    const teacher = getTeacher(a.teacherId);
+    const remaining = remainingFor(a);
+    totalNeeded += a.total; totalPlaced += (a.total - remaining);
+
+    const card = document.createElement('div');
+    const done = remaining === 0;
+    card.className = `lesson-card select-none rounded-xl border px-3 py-2 flex items-center justify-between gap-2 transition-opacity ${done ? 'opacity-40 border-slate-200 dark:border-slate-700' : 'border-slate-200 dark:border-slate-700 hover:shadow-md'}`;
+    card.style.borderLeft = `5px solid ${subj.color}`;
+    card.draggable = !done;
+    if (!done) card.addEventListener('dragstart', ev => handleSidebarDragStart(ev, a.id));
+    card.innerHTML = `
+      <div class="min-w-0">
+        <p class="text-sm font-semibold truncate">${subj.name}</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400 truncate">GV. ${teacher ? teacher.name : '—'}</p>
+      </div>
+      <span class="shrink-0 text-xs font-bold px-2 py-1 rounded-full ${done ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'}">
+        ${done ? '✓ Xong' : `${remaining}/${a.total}`}
+      </span>`;
+    list.appendChild(card);
+  });
+
+  $('#sidebarProgress').textContent = `${totalPlaced}/${totalNeeded} tiết`;
+  $('#sidebarProgressBar').style.width = totalNeeded ? `${Math.round(100*totalPlaced/totalNeeded)}%` : '0%';
+}
+
+function renderClassGrid(){
+  const classId = state.selectedClass;
+  const cls = getClass(classId);
+  $('#gridTitle').textContent = `Thời khóa biểu — Lớp ${cls.name}`;
+  $('#gridSubtitle').textContent = 'Kéo-thả để xếp hoặc hoán đổi tiết';
+
+  const container = $('#gridContainer');
+  container.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.className = 'grid text-sm';
+  grid.style.gridTemplateColumns = `92px repeat(${DAYS.length}, minmax(110px,1fr))`;
+
+  // Header ngày
+  grid.appendChild(headerCell(''));
+  DAYS.forEach(d => grid.appendChild(headerCell(d.label)));
+
+  SESSIONS.forEach(session => {
+    // Dòng nhãn buổi
+    const sessionRow = document.createElement('div');
+    sessionRow.className = 'col-span-full bg-slate-100 dark:bg-slate-800 text-[11px] font-display font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 px-2 py-1.5 mt-2 rounded-md';
+    sessionRow.style.gridColumn = `1 / span ${DAYS.length+1}`;
+    sessionRow.textContent = session.label;
+    grid.appendChild(sessionRow);
+
+    PERIODS.forEach(period => {
+      const rowLabel = document.createElement('div');
+      rowLabel.className = 'flex items-center justify-center text-xs font-semibold text-slate-500 dark:text-slate-400 py-1';
+      rowLabel.textContent = `Tiết ${period}`;
+      grid.appendChild(rowLabel);
+
+      DAYS.forEach(d => {
+        const key = cellKey(classId, d.id, session.id, period);
+        const assignmentId = state.schedule[key];
+        const status = computeCellStatus(classId, d.id, session.id, period);
+        const cell = document.createElement('div');
+        cell.className = `cell-drop relative rounded-lg m-0.5 min-h-[54px] flex items-center transition-colors ${statusClasses(status.level)}`;
+        cell.title = status.reasons.join(' | ');
+        cell.addEventListener('dragover', allowDrop);
+        cell.addEventListener('dragleave', dragLeaveCell);
+        cell.addEventListener('drop', ev => handleCellDrop(ev, classId, d.id, session.id, period));
+
+        if (assignmentId){
+          const a = getAssignment(assignmentId);
+          const subj = getSubject(a.subjectId);
+          const teacher = getTeacher(a.teacherId);
+          const card = document.createElement('div');
+          card.className = 'lesson-card group w-full h-full rounded-lg px-2 py-1.5 flex flex-col justify-center';
+          card.style.background = `${subj.color}1a`;
+          card.draggable = true;
+          card.addEventListener('dragstart', ev => handleCellDragStart(ev, key));
+          card.innerHTML = `
+            <div class="flex items-start justify-between gap-1">
+              <span class="text-[13px] font-semibold" style="color:${subj.color}">${subj.short}</span>
+              <button class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-500 text-xs leading-none transition-opacity" title="Bỏ tiết này">✕</button>
+            </div>
+            <span class="text-[11px] text-slate-500 dark:text-slate-400 truncate">${teacher ? teacher.name : ''}</span>`;
+          card.querySelector('button').addEventListener('click', (e)=>{ e.stopPropagation(); removeCell(key); });
+          cell.appendChild(card);
+        } else if (status.level === 'gap'){
+          cell.innerHTML = `<span class="w-full text-center text-[10px] font-medium text-amber-600 dark:text-amber-400">Tiết lủng</span>`;
+        }
+        grid.appendChild(cell);
+      });
+    });
+  });
+
+  container.appendChild(grid);
+}
+
+function headerCell(label){
+  const el = document.createElement('div');
+  el.className = 'text-center text-xs font-display font-semibold text-slate-500 dark:text-slate-400 py-1.5';
+  el.textContent = label;
+  return el;
+}
+
+function renderTeacherGrid(){
+  const teacherId = state.selectedTeacher;
+  const teacher = getTeacher(teacherId);
+  const subjNames = teacher.subjectIds.map(id=>getSubject(id).name).join(', ');
+  $('#gridTitle').textContent = `Lịch cá nhân — GV. ${teacher.name}`;
+  $('#gridSubtitle').textContent = `Phụ trách: ${subjNames}`;
+
+  const container = $('#gridContainer');
+  container.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.className = 'grid text-sm';
+  grid.style.gridTemplateColumns = `92px repeat(${DAYS.length}, minmax(110px,1fr))`;
+
+  grid.appendChild(headerCell(''));
+  DAYS.forEach(d => {
+    const load = computeTeacherDayLoad(teacherId, d.id);
+    const wrap = document.createElement('div');
+    wrap.className = 'text-center py-1.5';
+    wrap.innerHTML = `<p class="text-xs font-display font-semibold text-slate-500 dark:text-slate-400">${d.label}</p>
+      <p class="text-[10px] font-medium ${load > MAX_PER_DAY ? 'text-rose-500' : 'text-slate-400'}">${load} tiết</p>`;
+    grid.appendChild(wrap);
+  });
+
+  SESSIONS.forEach(session => {
+    const sessionRow = document.createElement('div');
+    sessionRow.className = 'col-span-full bg-slate-100 dark:bg-slate-800 text-[11px] font-display font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 px-2 py-1.5 mt-2 rounded-md';
+    sessionRow.style.gridColumn = `1 / span ${DAYS.length+1}`;
+    sessionRow.textContent = session.label;
+    grid.appendChild(sessionRow);
+
+    PERIODS.forEach(period => {
+      const rowLabel = document.createElement('div');
+      rowLabel.className = 'flex items-center justify-center text-xs font-semibold text-slate-500 dark:text-slate-400 py-1';
+      rowLabel.textContent = `Tiết ${period}`;
+      grid.appendChild(rowLabel);
+
+      DAYS.forEach(d => {
+        let found = null, foundClass = null;
+        CLASSES.forEach(c => {
+          const k = cellKey(c.id, d.id, session.id, period);
+          const aId = state.schedule[k];
+          if (aId && getAssignment(aId).teacherId === teacherId){ found = aId; foundClass = c; }
+        });
+        const cell = document.createElement('div');
+        cell.className = `rounded-lg m-0.5 min-h-[54px] flex items-center justify-center ${found ? 'bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-200 dark:ring-blue-800' : 'border border-dashed border-emerald-200 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/10'}`;
+        if (found){
+          const a = getAssignment(found);
+          const subj = getSubject(a.subjectId);
+          cell.innerHTML = `<div class="text-center leading-tight">
+              <p class="text-[13px] font-semibold" style="color:${subj.color}">${subj.short}</p>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400">Lớp ${foundClass.name}</p>
+            </div>`;
+        } else {
+          cell.innerHTML = `<span class="text-[10px] text-emerald-500 dark:text-emerald-400 font-medium">Trống</span>`;
+        }
+        grid.appendChild(cell);
+      });
+    });
+  });
+
+  container.appendChild(grid);
+}
+
+function renderViolations(){
+  const panel = $('#violationsPanel');
+  const items = [];
+
+  if (state.perspective === 'class'){
+    const classId = state.selectedClass;
+    DAYS.forEach(d => SESSIONS.forEach(s => PERIODS.forEach(p => {
+      const status = computeCellStatus(classId, d.id, s.id, p);
+      if (status.level === 'red' || status.level === 'yellow' || status.level === 'gap'){
+        status.reasons.forEach(r => items.push({ level: status.level, text: `${d.label}, ${s.label}, Tiết ${p}: ${r}` }));
+      }
+    })));
+  } else {
+    DAYS.forEach(d => {
+      const load = computeTeacherDayLoad(state.selectedTeacher, d.id);
+      if (load > MAX_PER_DAY) items.push({ level:'yellow', text:`${d.label}: GV dạy ${load} tiết — vượt mức khuyến nghị ${MAX_PER_DAY} tiết/ngày.` });
+    });
+  }
+
+  if (!items.length){
+    panel.innerHTML = `<div class="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 rounded-xl px-4 py-3">
+      <span>✅</span><span>Không phát hiện vi phạm nào — thời khóa biểu hiện tại đạt chuẩn "đẹp".</span></div>`;
+    return;
+  }
+
+  const reds = items.filter(i=>i.level==='red').length;
+  const yellows = items.length - reds;
+  panel.innerHTML = `
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
+      <div class="flex items-center gap-3 mb-3">
+        <h3 class="font-display font-semibold text-sm">Danh sách cảnh báo</h3>
+        <span class="text-xs px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 font-semibold">${reds} nghiêm trọng</span>
+        <span class="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 font-semibold">${yellows} cảnh báo nhẹ</span>
+      </div>
+      <ul class="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+        ${items.map(i => `<li class="text-xs flex items-start gap-2">
+            <span class="mt-0.5">${i.level==='red' ? '🔴' : (i.level==='gap' ? '🟠' : '🟡')}</span>
+            <span class="text-slate-600 dark:text-slate-300">${i.text}</span>
+          </li>`).join('')}
+      </ul>
+    </div>`;
+}
+
+/* =========================================================================
+   8) XUẤT DỮ LIỆU (CSV / EXCEL / ẢNH) + IN
+   ========================================================================= */
+function toggleExportMenu(){ $('#exportMenu').classList.toggle('hidden'); }
+document.addEventListener('click', (e) => {
+  const menu = $('#exportMenu');
+  if (!menu.contains(e.target) && !e.target.closest('button[onclick="toggleExportMenu()"]')) menu.classList.add('hidden');
+});
+
+function buildScheduleRows(){
+  // Trả về mảng hàng [Ngày, Buổi, Tiết, Môn, Giáo viên, Lớp] cho phạm vi đang xem
+  const rows = [['Ngày','Buổi','Tiết','Môn học','Giáo viên','Lớp']];
+  const classIds = state.perspective === 'class' ? [state.selectedClass] : CLASSES.map(c=>c.id);
+  DAYS.forEach(d => SESSIONS.forEach(s => PERIODS.forEach(p => {
+    classIds.forEach(classId => {
+      const aId = state.schedule[cellKey(classId, d.id, s.id, p)];
+      if (!aId) return;
+      const a = getAssignment(aId);
+      if (state.perspective === 'teacher' && a.teacherId !== state.selectedTeacher) return;
+      const subj = getSubject(a.subjectId);
+      const teacher = getTeacher(a.teacherId);
+      rows.push([d.label, s.label, `Tiết ${p}`, subj.name, teacher?teacher.name:'', getClass(classId).name]);
+    });
+  })));
+  return rows;
+}
+
+function exportCSV(){
+  const rows = buildScheduleRows();
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv], { type:'text/csv;charset=utf-8;' });
+  downloadBlob(blob, `TKB_${entityLabelForFile()}.csv`);
+  showToast('Đã xuất file CSV.', 'success');
+}
+
+function exportExcel(){
+  if (typeof XLSX === 'undefined'){ showToast('Không tải được thư viện Excel.', 'danger'); return; }
+  const rows = buildScheduleRows();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:8},{wch:12},{wch:8},{wch:14},{wch:18},{wch:8}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'TKB');
+  XLSX.writeFile(wb, `TKB_${entityLabelForFile()}.xlsx`);
+  showToast('Đã xuất file Excel.', 'success');
+}
+
+function exportImage(){
+  if (typeof html2canvas === 'undefined'){ showToast('Không tải được thư viện xuất ảnh.', 'danger'); return; }
+  showToast('Đang tạo hình ảnh...', 'success');
+  html2canvas($('#printArea'), { backgroundColor: document.documentElement.classList.contains('dark') ? '#0f172a' : '#ffffff', scale:2 }).then(canvas => {
+    canvas.toBlob(blob => downloadBlob(blob, `TKB_${entityLabelForFile()}.png`));
+  });
+}
+
+function printView(){ window.print(); }
+
+function entityLabelForFile(){
+  return state.perspective === 'class' ? getClass(state.selectedClass).name : getTeacher(state.selectedTeacher).name.replace(/\s+/g,'_');
+}
+function downloadBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* =========================================================================
+   8b) ĐỔI TÊN LỚP / GIÁO VIÊN
+   ---------------------------------------------------------------------
+   Chỉ đổi thuộc tính `name` trên các object CLASSES/TEACHERS đã có sẵn —
+   giữ nguyên `id`, nên toàn bộ phân công (assignments) và lịch đã xếp
+   (state.schedule) không bị ảnh hưởng, chỉ đổi nhãn hiển thị.
+   ========================================================================= */
+function openManageModal(){ renderManageModal(); $('#manageModal').classList.remove('hidden'); }
+function closeManageModal(){ $('#manageModal').classList.add('hidden'); }
+
+function renderManageModal(){
+  const cList = $('#manageClassList');
+  cList.innerHTML = '';
+  CLASSES.forEach(c => {
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2';
+    row.innerHTML = `
+      <span class="text-[11px] text-slate-400 w-9 shrink-0">Khối ${c.grade}</span>
+      <input data-class-id="${c.id}" value="${c.name}" class="manage-class-input flex-1 text-sm border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500">`;
+    cList.appendChild(row);
+  });
+
+  const tList = $('#manageTeacherList');
+  tList.innerHTML = '';
+  TEACHERS.forEach(t => {
+    const subjNames = t.subjectIds.map(id => getSubject(id).short).join(', ');
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2';
+    row.innerHTML = `
+      <input data-teacher-id="${t.id}" value="${t.name}" class="manage-teacher-input flex-1 text-sm border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <span class="text-[10px] text-slate-400 w-16 shrink-0 truncate" title="${subjNames}">${subjNames}</span>`;
+    tList.appendChild(row);
+  });
+}
+
+function saveManage(){
+  document.querySelectorAll('.manage-class-input').forEach(inp => {
+    const c = getClass(inp.dataset.classId);
+    if (c && inp.value.trim()) c.name = inp.value.trim();
+  });
+  document.querySelectorAll('.manage-teacher-input').forEach(inp => {
+    const t = getTeacher(inp.dataset.teacherId);
+    if (t && inp.value.trim()) t.name = inp.value.trim();
+  });
+  populateEntitySelect();
+  renderAll();
+  closeManageModal();
+  showToast('Đã cập nhật tên lớp / giáo viên.', 'success');
+}
+
+/* =========================================================================
+   9) TOAST THÔNG BÁO
+   ========================================================================= */
+function showToast(message, type){
+  const host = $('#toastHost');
+  const colors = { success:'bg-emerald-600', warning:'bg-amber-500', danger:'bg-rose-600' };
+  const el = document.createElement('div');
+  el.className = `${colors[type]||colors.success} text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-lg max-w-xs`;
+  el.textContent = message;
+  host.appendChild(el);
+  setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(), 300); }, 3200);
+}
+
+/* =========================================================================
+   10) GIAO DIỆN SÁNG / TỐI (per-viewer, lưu bằng localStorage)
+   ========================================================================= */
+function applyTheme(isDark){
+  document.documentElement.classList.toggle('dark', isDark);
+  updateThemeButton();
+}
+function updateThemeButton(){
+  const isDark = document.documentElement.classList.contains('dark');
+  $('#themeBtn').innerHTML = isDark
+    ? `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>`
+    : `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+}
+function toggleTheme(){
+  const isDark = !document.documentElement.classList.contains('dark');
+  applyTheme(isDark);
+  try { localStorage.setItem('soantkb-theme', isDark ? 'dark' : 'light'); } catch(e){}
+}
+function initTheme(){
+  let saved = null;
+  try { saved = localStorage.getItem('soantkb-theme'); } catch(e){}
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(saved ? saved === 'dark' : prefersDark);
+}
+
+/* =========================================================================
+   11) KHỞI TẠO
+   ========================================================================= */
+function init(){
+  initTheme();
+  populateEntitySelect();
+  renderAll();
+}
+init();
+</script>
+</body>
+</html>
